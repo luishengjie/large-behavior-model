@@ -1,0 +1,39 @@
+seed: 42
+
+model:
+  name: Qwen/Qwen2.5-0.5B-Instruct
+  max_sequence_length: 8192
+
+persona:
+  max_tokens: 7000
+
+training:
+  learning_rate: 0.0002
+  epochs: 1
+  train_batch_size: 1
+  eval_batch_size: 1
+  gradient_accumulation_steps: 8
+  gradient_checkpointing: true
+  weight_decay: 0.0
+  warmup_ratio: 0.03
+  scheduler: cosine
+  logging_steps: 10
+  eval_steps: 200
+  save_steps: 200
+  save_total_limit: 2
+  bf16: true
+  fp16: false
+  report_to: none
+
+lora:
+  rank: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj

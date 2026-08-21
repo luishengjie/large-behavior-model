@@ -1,4 +1,4 @@
-"""Build leakage-safe question-level datasets from Twin-2K-500 wave splits."""
+"""Convert participant-level Twin-2K-500 rows into question-level examples."""
 
 from __future__ import annotations
 
@@ -11,8 +11,7 @@ from tqdm.auto import tqdm
 
 from .question_formatting import format_question, format_target
 
-
-TRAINING_FEATURES = Features(
+QUESTION_FEATURES = Features(
     {
         "pid": Value("string"),
         "block_name": Value("string"),
@@ -28,7 +27,9 @@ def _load_blocks(raw_blocks: object, *, pid: str, field: str) -> list[dict[str, 
     try:
         blocks = json.loads(raw_blocks) if isinstance(raw_blocks, str) else raw_blocks
     except json.JSONDecodeError as error:
-        raise ValueError(f"Invalid JSON in {field!r} for participant {pid!r}.") from error
+        raise ValueError(
+            f"Invalid JSON in {field!r} for participant {pid!r}."
+        ) from error
 
     if not isinstance(blocks, list):
         raise TypeError(f"Expected a list of blocks in {field!r} for PID {pid!r}.")
@@ -42,11 +43,11 @@ def build_question_dataset(
     pid_field: str = "pid",
     progress_desc: str | None = None,
 ) -> Dataset:
-    """Create one model-target example per answerable survey question.
+    """Converts participant response blocks into question-level examples.
+    Each output row contains a masked survery question and the participant's ground-truth
+    response. Descriptive blocks and questions without responses are excluded.
 
-    Personas are intentionally excluded to avoid storing the same long persona once
-    per question. Join them by ``pid`` only while constructing/tokenizing messages.
-    Descriptive-information (``DB``) records are skipped because they have no target.
+    Personas are stored seperately and jopined by PID.
     """
 
     records: list[dict[str, str]] = []
@@ -86,11 +87,11 @@ def build_question_dataset(
 
     if not records:
         return Dataset.from_dict(
-            {column: [] for column in TRAINING_FEATURES},
-            features=TRAINING_FEATURES,
+            {column: [] for column in QUESTION_FEATURES},
+            features=QUESTION_FEATURES,
         )
 
-    return Dataset.from_list(records, features=TRAINING_FEATURES)
+    return Dataset.from_list(records, features=QUESTION_FEATURES)
 
 
 def build_persona_lookup(
@@ -99,7 +100,7 @@ def build_persona_lookup(
     persona_field: str = "wave1_3_persona_text",
     pid_field: str = "pid",
 ) -> dict[str, str]:
-    """Return PID-to-persona text without duplicating personas by question."""
+    """Map each participant ID (PID) to its corresponding persona text."""
 
     personas: dict[str, str] = {}
     for row_number, participant in enumerate(dataset):

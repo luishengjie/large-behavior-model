@@ -1,4 +1,4 @@
-"""Construct chat-formatted supervised fine-tuning examples."""
+"""Build model prompts while keeping ground-truth responses separate."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ from typing import Any
 
 from datasets import Dataset, Features, Value
 from tqdm.auto import tqdm
-
 
 SYSTEM_PROMPT = """
 You are an AI assistant. Answer the new survey question as if you are the
@@ -18,7 +17,7 @@ required answer structure. Do not include explanations or Markdown.
 """.strip()
 
 
-SFT_FEATURES = Features(
+PROMPT_FEATURES = Features(
     {
         "pid": Value("string"),
         "block_name": Value("string"),
@@ -75,7 +74,7 @@ def response_format_instruction(question_type: str) -> str:
     raise ValueError(f"Unsupported question type: {question_type!r}.")
 
 
-def build_sft_messages(
+def build_prompt_messages(
     example: Mapping[str, Any],
     persona: str,
     *,
@@ -104,7 +103,7 @@ def build_sft_messages(
     return messages
 
 
-def build_sft_dataset(
+def build_prompt_dataset(
     question_dataset: Dataset,
     persona_lookup: Mapping[str, str],
     tokenizer: Any,
@@ -113,7 +112,7 @@ def build_sft_dataset(
     system_prompt: str = SYSTEM_PROMPT,
     progress_desc: str | None = None,
 ) -> Dataset:
-    """Create model-agnostic prompt/target rows without target leakage."""
+    """Build model prompts and ground-truth responses from participant data."""
 
     records: list[dict[str, str]] = []
     truncated_personas: dict[str, str] = {}
@@ -132,7 +131,7 @@ def build_sft_dataset(
                 persona_lookup[pid], tokenizer, max_tokens=max_persona_tokens
             )
         persona = truncated_personas[pid]
-        messages = build_sft_messages(
+        messages = build_prompt_messages(
             example,
             persona,
             include_target=False,
@@ -156,6 +155,6 @@ def build_sft_dataset(
 
     if not records:
         return Dataset.from_dict(
-            {column: [] for column in SFT_FEATURES}, features=SFT_FEATURES
+            {column: [] for column in PROMPT_FEATURES}, features=PROMPT_FEATURES
         )
-    return Dataset.from_list(records, features=SFT_FEATURES)
+    return Dataset.from_list(records, features=PROMPT_FEATURES)

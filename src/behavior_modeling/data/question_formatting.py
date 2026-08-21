@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from typing import Any
 from .text import clean_text
 
+
 def _format_numbered_items(values: Sequence[object], *, separator: str) -> str:
     return "\n".join(
         f"  {position} {separator} {clean_text(value)}"
@@ -22,8 +23,7 @@ def _format_matrix(question: dict[str, Any]) -> list[str]:
     sections = ["Question type: Matrix"]
     if columns:
         sections.append(
-            "Response options:\n"
-            + _format_numbered_items(columns, separator="=")
+            "Response options:\n" + _format_numbered_items(columns, separator="=")
         )
 
     if rows:
@@ -47,8 +47,7 @@ def _format_multiple_choice(question: dict[str, Any]) -> list[str]:
     sections = [f"Question type: {display_type}"]
     if options:
         sections.append(
-            "Response options:\n"
-            + _format_numbered_items(options, separator="-")
+            "Response options:\n" + _format_numbered_items(options, separator="-")
         )
     sections.append("Answer: [Masked]")
     return sections
