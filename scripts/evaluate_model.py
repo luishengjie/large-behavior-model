@@ -14,7 +14,11 @@ from datasets import DatasetDict, load_from_disk
 from tqdm.auto import tqdm
 
 from behavior_modeling.evaluation import (
+    TWIN2K500_ANCHORING_GROUPS,
+    calculate_model_accuracy,
     generate_response,
+    get_twin2k500_response_ranges,
+    get_twin2k500_task_mapping,
     load_base_model,
     load_lora_model,
 )
@@ -250,6 +254,70 @@ def main() -> None:
         device=device,
         max_new_tokens=args.max_new_tokens,
     )
+    author_compatible_accuracy = calculate_model_accuracy(
+        records,
+        response_ranges=get_twin2k500_response_ranges(),
+        task_mapping=get_twin2k500_task_mapping(),
+        anchoring_groups=TWIN2K500_ANCHORING_GROUPS,
+        missing_comparison="exclude",
+    )
+    accuracy_including_invalid = calculate_model_accuracy(
+        records,
+        response_ranges=get_twin2k500_response_ranges(),
+        task_mapping=get_twin2k500_task_mapping(),
+        anchoring_groups=TWIN2K500_ANCHORING_GROUPS,
+        missing_comparison="zero",
+    )
+    author_task_results = {
+        str(row["task"]): row
+        for row in author_compatible_accuracy.task_summary.to_dict(orient="records")
+    }
+    by_task = {}
+    for row in accuracy_including_invalid.task_summary.to_dict(orient="records"):
+        task = str(row["task"])
+        author_row = author_task_results.get(task)
+        by_task[task] = {
+            "normalized_accuracy": (
+                float(author_row["accuracy"]) if author_row is not None else None
+            ),
+            "normalized_accuracy_including_invalid": float(row["accuracy"]),
+            "exact_match_accuracy": (
+                float(author_row["exact_match_accuracy"])
+                if author_row is not None
+                else None
+            ),
+            "valid_prediction_rate": float(row["valid_comparison_rate"]),
+            "participants": (
+                int(author_row["participants"]) if author_row is not None else 0
+            ),
+            "scored_responses": (
+                int(author_row["responses"]) if author_row is not None else 0
+            ),
+            "eligible_responses": int(row["responses"]),
+        }
+    summary.update(
+        {
+            "task_weighted_normalized_accuracy": (
+                author_compatible_accuracy.task_weighted_normalized_accuracy
+            ),
+            "task_weighted_normalized_accuracy_including_invalid": (
+                accuracy_including_invalid.task_weighted_normalized_accuracy
+            ),
+            "normalized_accuracy": author_compatible_accuracy.normalized_accuracy,
+            "normalized_accuracy_including_invalid": (
+                accuracy_including_invalid.normalized_accuracy
+            ),
+            "scored_participants": author_compatible_accuracy.n_participants,
+            "scored_tasks": author_compatible_accuracy.n_tasks,
+            "scored_responses": author_compatible_accuracy.n_responses,
+            "eligible_responses": accuracy_including_invalid.n_responses,
+            "scoreable_response_rate": (
+                author_compatible_accuracy.n_responses
+                / accuracy_including_invalid.n_responses
+            ),
+            "by_task": by_task,
+        }
+    )
     summary.update(
         {
             "model_type": model_type,
@@ -278,10 +346,11 @@ def main() -> None:
 
     LOGGER.info(
         "Evaluation complete: valid_json=%.2f%%, valid_schema=%.2f%%, "
-        "exact_match=%.2f%%",
+        "exact_match=%.2f%%, task_weighted_normalized_accuracy=%.2f%%",
         100 * summary["valid_json_rate"],
         100 * summary["valid_schema_rate"],
         100 * summary["exact_match_accuracy"],
+        100 * summary["task_weighted_normalized_accuracy"],
     )
     print(json.dumps(summary, indent=2, sort_keys=True))
 

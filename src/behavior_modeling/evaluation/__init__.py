@@ -1,5 +1,9 @@
 """Evaluation utilities for behavior-modeling experiments."""
 
+from .digital_twin_metrics import (
+    AccuracyResult,
+    calculate_task_weighted_normalized_accuracy,
+)
 from .inference import (
     GeneratedResponse,
     generate_response,
@@ -7,6 +11,7 @@ from .inference import (
     load_lora_model,
     parse_generated_response,
 )
+from .model_accuracy import build_model_response_tables, calculate_model_accuracy
 from .test_retest import TestRetestResult, calculate_test_retest
 from .twin2k500_schema import (
     TWIN2K500_ANCHORING_GROUPS,
@@ -15,10 +20,14 @@ from .twin2k500_schema import (
 )
 
 __all__ = [
+    "AccuracyResult",
     "GeneratedResponse",
     "TWIN2K500_ANCHORING_GROUPS",
     "TestRetestResult",
+    "build_model_response_tables",
+    "calculate_model_accuracy",
     "calculate_test_retest",
+    "calculate_task_weighted_normalized_accuracy",
     "generate_response",
     "get_twin2k500_response_ranges",
     "get_twin2k500_task_mapping",

@@ -4,6 +4,12 @@ The definitions mirror ``get_default_column_ranges`` and
 ``get_default_qid_to_task`` in the authors' Digital-Twin-Simulation
 repository, translated to the raw ``csv_columns`` names in the released
 question catalog.
+
+Original repository:
+https://github.com/tianyipeng-lab/Digital-Twin-Simulation
+
+Adapted from ``evaluation/mad_accuracy_evaluation.py`` under the Apache
+License 2.0.
 """
 
 from __future__ import annotations
