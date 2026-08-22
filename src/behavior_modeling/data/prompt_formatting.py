@@ -16,6 +16,13 @@ and stated characteristics. Return only a valid JSON object matching the
 required answer structure. Do not include explanations or Markdown.
 """.strip()
 
+NO_PERSONA_SYSTEM_PROMPT = """
+You are an AI assistant. Predict a plausible response to the new survey
+question without access to participant history. Return only a valid JSON
+object matching the required answer structure. Do not include explanations
+or Markdown.
+""".strip()
+
 
 PROMPT_FEATURES = Features(
     {
@@ -76,21 +83,27 @@ def response_format_instruction(question_type: str) -> str:
 
 def build_prompt_messages(
     example: Mapping[str, Any],
-    persona: str,
+    persona: str | None,
     *,
     include_target: bool,
-    system_prompt: str = SYSTEM_PROMPT,
+    system_prompt: str | None = None,
 ) -> list[dict[str, str]]:
     """Create train or inference messages for one survey question."""
 
+    if system_prompt is None:
+        system_prompt = (
+            SYSTEM_PROMPT if persona is not None else NO_PERSONA_SYSTEM_PROMPT
+        )
+
+    persona_section = (
+        f"## Persona Profile\n\n{persona}\n\n" if persona is not None else ""
+    )
     messages = [
         {"role": "system", "content": system_prompt},
         {
             "role": "user",
             "content": (
-                "## Persona Profile\n\n"
-                f"{persona}\n\n"
-                "## New Survey Question\n\n"
+                persona_section + "## New Survey Question\n\n"
                 f"{example['question_prompt']}\n\n"
                 "## Required Response Format\n\n"
                 f"{response_format_instruction(str(example['question_type']))}\n\n"
@@ -105,11 +118,11 @@ def build_prompt_messages(
 
 def build_prompt_dataset(
     question_dataset: Dataset,
-    persona_lookup: Mapping[str, str],
+    persona_lookup: Mapping[str, str] | None,
     tokenizer: Any,
     *,
     max_persona_tokens: int | None = None,
-    system_prompt: str = SYSTEM_PROMPT,
+    system_prompt: str | None = None,
     progress_desc: str | None = None,
 ) -> Dataset:
     """Build model prompts and ground-truth responses from participant data."""
@@ -123,14 +136,15 @@ def build_prompt_dataset(
     )
     for example in examples:
         pid = str(example["pid"])
-        if pid not in persona_lookup:
-            raise KeyError(f"No persona found for PID {pid!r}.")
-
-        if pid not in truncated_personas:
-            truncated_personas[pid] = truncate_persona(
-                persona_lookup[pid], tokenizer, max_tokens=max_persona_tokens
-            )
-        persona = truncated_personas[pid]
+        persona = None
+        if persona_lookup is not None:
+            if pid not in persona_lookup:
+                raise KeyError(f"No persona found for PID {pid!r}.")
+            if pid not in truncated_personas:
+                truncated_personas[pid] = truncate_persona(
+                    persona_lookup[pid], tokenizer, max_tokens=max_persona_tokens
+                )
+            persona = truncated_personas[pid]
         messages = build_prompt_messages(
             example,
             persona,

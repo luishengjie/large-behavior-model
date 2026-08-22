@@ -3,7 +3,7 @@ import json
 from datasets import Dataset
 
 from behavior_modeling.data import build_prompt_dataset, build_prompt_messages
-from behavior_modeling.models.sft import tokenize_sft_batch
+from behavior_modeling.training.sft import tokenize_sft_batch
 
 
 class FakeTokenizer:
@@ -68,6 +68,33 @@ def test_build_prompt_dataset_keeps_target_separate_from_prompt() -> None:
 
     assert len(prompt_data) == 1
     assert "Compact persona" in prompt_data[0]["prompt_text"]
+    assert prompt_data[0]["target_text"] not in prompt_data[0]["prompt_text"]
+
+
+def test_build_prompt_dataset_can_exclude_persona() -> None:
+    questions = Dataset.from_list(
+        [
+            {
+                "pid": "1",
+                "block_name": "Block",
+                "question_id": "Q1",
+                "question_type": "MC",
+                "question_prompt": "Choose one. Answer: [Masked]",
+                "target": '{"SelectedByPosition": 1, "SelectedText": "Yes"}',
+            }
+        ]
+    )
+
+    prompt_data = build_prompt_dataset(
+        questions,
+        None,
+        FakeTokenizer(),
+    )
+
+    assert len(prompt_data) == 1
+    assert "Persona Profile" not in prompt_data[0]["prompt_text"]
+    assert "without access to participant history" in prompt_data[0]["prompt_text"]
+    assert "New Survey Question" in prompt_data[0]["prompt_text"]
     assert prompt_data[0]["target_text"] not in prompt_data[0]["prompt_text"]
 
 

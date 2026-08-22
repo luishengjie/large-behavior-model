@@ -28,7 +28,8 @@ def prepare_prompt_datasets(
     data_config: dict[str, Any],
     model_config: dict[str, Any],
     *,
-    persona_field: str,
+    persona_field: str | None,
+    exclude_persona: bool = False,
     target_field: str,
 ) -> DatasetDict:
     """Converts preprocessed dataset into question-level examples for model training and evaluation."""
@@ -37,8 +38,10 @@ def prepare_prompt_datasets(
     model_settings = model_config["model"]
     persona_config = model_config.get("persona", {})
 
-    if not persona_field:
-        raise ValueError("persona_field must specify a participant persona column.")
+    if exclude_persona == bool(persona_field):
+        raise ValueError(
+            "Specify exactly one persona mode: persona_field or exclude_persona."
+        )
     if not target_field:
         raise ValueError("target_field must specify a held-out answer column.")
 
@@ -87,9 +90,13 @@ def prepare_prompt_datasets(
             field=target_field,
             progress_desc=f"Extracting {split_name} questions",
         )
-        personas = build_persona_lookup(
-            participant_dataset,
-            persona_field=persona_field,
+        personas = (
+            None
+            if exclude_persona
+            else build_persona_lookup(
+                participant_dataset,
+                persona_field=str(persona_field),
+            )
         )
         model_splits[split_name] = build_prompt_dataset(
             questions,
@@ -118,12 +125,20 @@ def parse_args() -> argparse.Namespace:
         "--model-config",
         default="configs/models/qwen25_05b_lora.yaml",
     )
-    parser.add_argument(
+    persona_group = parser.add_mutually_exclusive_group(required=True)
+    persona_group.add_argument(
         "--persona-field",
-        required=True,
         help=(
             "Participant persona column, such as "
             "'wave1_3_compact_persona_text' or 'wave1_3_persona_text'."
+        ),
+    )
+    persona_group.add_argument(
+        "--exclude-persona",
+        action="store_true",
+        help=(
+            "Exclude participant persona text from generated prompts for the "
+            "no-persona baseline."
         ),
     )
     parser.add_argument(
@@ -164,12 +179,16 @@ def main() -> None:
     model_config = load_config(args.model_config)
     if not isinstance(model_config.get("model"), dict):
         raise KeyError("Model configuration must contain a 'model' mapping.")
-    LOGGER.info("Persona field: %s", args.persona_field)
+    if args.exclude_persona:
+        LOGGER.info("Preparing no-persona baseline prompts")
+    else:
+        LOGGER.info("Persona field: %s", args.persona_field)
     LOGGER.info("Target field: %s", args.target_field)
     datasets = prepare_prompt_datasets(
         data_config,
         model_config,
         persona_field=args.persona_field,
+        exclude_persona=args.exclude_persona,
         target_field=args.target_field,
     )
 
@@ -181,8 +200,13 @@ def main() -> None:
         "data_config": str(args.data_config),
         "model_config": str(args.model_config),
         "persona_field": args.persona_field,
+        "exclude_persona": args.exclude_persona,
         "target_field": args.target_field,
-        "max_persona_tokens": model_config.get("persona", {}).get("max_tokens"),
+        "max_persona_tokens": (
+            None
+            if args.exclude_persona
+            else model_config.get("persona", {}).get("max_tokens")
+        ),
         "splits": {name: len(dataset) for name, dataset in datasets.items()},
     }
     (args.output_dir / "dataset_metadata.json").write_text(

@@ -10,6 +10,7 @@ from .question_formatting import format_question, format_target
 from .text import clean_text
 
 from .prompt_formatting import (
+    NO_PERSONA_SYSTEM_PROMPT,
     SYSTEM_PROMPT,
     build_prompt_dataset,
     build_prompt_messages,
@@ -30,6 +31,7 @@ __all__ = [
     "format_compact_question",
     "format_question",
     "format_target",
+    "NO_PERSONA_SYSTEM_PROMPT",
     "response_format_instruction",
     "SYSTEM_PROMPT",
     "truncate_persona",
