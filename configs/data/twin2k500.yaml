@@ -5,5 +5,5 @@ data:
   dataset_config: wave_split
   split: data
   train_ratio: 0.70
-  validation_ratio: 0.15
+  validation_ratio: 0.10
   preprocessed_data_dir: data/processed/twin2k500_compact
