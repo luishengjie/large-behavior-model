@@ -219,4 +219,6 @@ __marimo__/
 
 logs/
 /data/
+/results/
 .DS_Store
+/notebooks/archive/
