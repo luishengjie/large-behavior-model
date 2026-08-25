@@ -110,7 +110,9 @@ def answer_blocks_to_frame(
 
         raw_blocks = row[field]
         try:
-            blocks = json.loads(raw_blocks) if isinstance(raw_blocks, str) else raw_blocks
+            blocks = (
+                json.loads(raw_blocks) if isinstance(raw_blocks, str) else raw_blocks
+            )
         except json.JSONDecodeError as error:
             raise ValueError(
                 f"Invalid JSON in {field!r} for participant {pid!r}."
@@ -168,4 +170,3 @@ def answer_blocks_to_frame(
         frame = frame.apply(pd.to_numeric, errors="coerce")
 
     return frame.sort_index(axis=1)
-
