@@ -248,7 +248,7 @@ The training configuration is summarized as follows:
 |---|---|
 | Base model | `Qwen/Qwen2.5-0.5B-Instruct` |
 | Epochs | 1 |
-| Learning rate | \(2 \times 10^{-4}\) |
+| Learning rate | `2e-4` |
 | Per-device batch size | 1 |
 | Gradient accumulation steps | 8 |
 | Effective batch size | 8 on one GPU |
