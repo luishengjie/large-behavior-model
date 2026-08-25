@@ -136,6 +136,17 @@ The persiba and held-out question are provided to the model as inputs while the 
 Prompt construction and response formatting are implemented in `src/behavior_modeling/data/prompt_formatting.py`.
 
 
+### Modeling Approaches
+Several modeling techniques were considered
+| Approach | Role | Trade-off |
+|---|---|---|
+| Prompting | Establish zero-shot baseline | Cheap, but weak schema reliability |
+| LoRA SFT | Learn task formats and response patterns | May learn population-level patterns without using persona |
+| Persona retrieval | Select history relevant to each target question | Reduces context length but may omit useful information. The retrieval method must identify relevant context even when earlier questions are phrased or structured differently from the target.  |
+| Preference/RL tuning | Possible later optimization | Requires a trustworthy reward. May not be so useful for the initial supervised task |
+
+
+
 ### Supervised Fine-tuning
 
 Prompt instructions alone do not gurantee that an open-weight model will consistently produce responses that matches the output schema. During intial evaluation, the base **Qwen2.5-0.5B-Instruct** model produced malformed outputs for some survey questions. For example, for participant `304` and question `QID203`, 
@@ -186,9 +197,10 @@ During training, loss is computed over the target response tokens. The persona a
 
 Finetuning is perfomed using Low-Rank Adaptation (LoRA) rather than full-parameter fine-tuning. LoRA keeps the base-model weights frozen and introduces a smaller set of trainable low-rank parameters.
 
-This reduces the number of training paramters, optimizer-state memory, checkpoint size, and overall GPU-memory requirements. It therefore proves a practi al approach for testing whether supervised fine-tuning improves prediction performance before considering larger models or more computationally expensive training strategies.
+This reduces the number of training paramters, optimizer-state memory, checkpoint size, and overall GPU-memory requirements. This provides a practical approach to test whether SFT can improve prediction performance before considering larger models or more computationally expensive training strategies.
 
-The LoRA configuration used in this experiment is
+
+The LoRA configuration used in this experiment is as follows:
 | Parameter | Value |
 |---|---|
 | Rank (`r`) | 16 |
@@ -293,7 +305,7 @@ For **RQ2**, the effect of supervised finetuning is evaluated by comparing
 These comparisons also indicate whether the benefit of persona information changes after supervised fine-tuning.
 
 ### Evaluation Strategy
-Following Toubia et al. (2025), the participant's response for each held-out question for waves 1-3 is treated as the ground-truth. Model predictions are evaluated against the waves 4 responses.
+Model predictions are evaluated against the participant's observed wave 4 response. 
 
 
 | Evaluation | Ground-truth reference | Prediction or comparison |
@@ -346,10 +358,10 @@ $$
 
 where:
 
-- $y$ is the ground-truth response,
-- $\hat{y}$ is the predicted response,
-- $L$ is the minimum valid response value, and
-- $U$ is the maximum valid response value.
+- $y$ is the ground-truth response
+- $\hat{y}$ is the predicted response
+- $L$ is the minimum valid response value
+- $U$ is the maximum valid response value
 
 A score of 1 indicates an exact match, while lower scores indicate greater disagreement between the predicted and ground-truth responses.
 
@@ -366,6 +378,13 @@ Formatting errors can prevent generated responses from being scored. Coverage me
 | `scored_responses` | Number of eligible responses for which the model produced a complete, valid prediction. |
 | `scoreable_response_rate` | Proportion of eligible responses that could be scored, calculated as `scored_responses / eligible_responses`. |
 | `scored_tasks` | Number of behavioral tasks containing at least one scoreable model prediction. |
+
+#### Acceptance Criteria
+The intial experiment is considered successful if:
+
+1. Fine-tuning improves format accuracy over base models.
+2. Fine-tuning improves the **task-weighted normalized accuracy including invalid predictions**,  over the corresponding base model.
+3. Adding persona context improves accuracy over the matched no-persona condition.
 
 
 ## Evaluation Results
@@ -384,13 +403,13 @@ The models used for evaluation are as follows:
 
 ### Overall Prediction Performance
 
-| Model condition | Exact-match accuracy | Task-weighted normalized accuracy | Primary accuracy including invalid |
+| Model condition | Exact match | Task-weighted normalized accuracy | Primary accuracy including invalid |
 |---|---:|---:|---:|
-| Base model, no persona | 19.54% | 28.05% | 21.50% |
-| Base model + persona | 41.26% | 51.13% | 40.41% |
-| Fine-tuned model, no persona | 45.02% | **67.45%** | **67.45%** |
-| Fine-tuned model + persona | **45.82%** | 67.42% | 67.42% |
-| Human test–retest (reference only) | — | 83.45% | Not applicable |
+| Base model, no persona | 18.84% | 28.60% | 21.78% |
+| Base model + persona | 40.40% | 49.73% | 39.47% |
+| Fine-tuned model, no persona | 55.06% | 71.59% | 71.59% |
+| Fine-tuned model + persona | **55.52%** | **71.75%** | **71.75%** |
+| Human test–retest reference | - | 83.45% | Not applicable |
 
 The primary metric is task-weighted normalized accuracy including invalid predictions. Invalid or unscoreable responses receive zero credit under this metric.
 
@@ -426,25 +445,40 @@ behavioral tasks. This supports the conclusion that SFT improved response-struct
 
 | Model | Without persona | With persona | Persona effect |
 |---|---:|---:|---:|
-| Base model | 21.50% | 40.41% | **+18.91%** |
-| Fine-tuned model | 67.45% | 67.42% | **−0.03%** |
+| Base model | 21.78% | 39.47% | **+17.69%** |
+| Fine-tuned model | 71.59% | 71.75% | **+0.16%** |
 
-The base model benefited substantialy from persona context. However, the finetuned model achieved near identical task-weighted accuracy with and without the persona. The current results do not show that the fine-tuned model learned to use participant-specific context effectively.
+The inclusion of persona context substantialy improves the base model. Howwever, finetuned models achieved near identical task-weighted accuracy with and without the persona. The current results do not demonstrate that finetuned models learned to use context to generate accurate wave 4 responses.
 
 ### RQ2: Effect of supervised fine-tuning
-| Input condition | Base model | Fine-tuned model | Fine-tuning effect |
+| Input condition | Base model | Fine-tuned model | SFT effect |
 |---|---:|---:|---:|
-| Without persona | 21.50% | 67.45% | **+45.95 pp** |
-| With persona | 40.41% | 67.42% | **+27.01 pp** |
+| Without persona | 21.78% | 71.59% | **+49.81%** |
+| With persona | 39.47% | 71.75% | **+32.28%** |
 
 Supervised fine-tuning substantially improved the primary accuracy metric under both conditions. It also increased valid JSON, schema validity, scoreable-response coverage, and task coverage to 100%.
 
 
 ### Summary
-SFT demostrated a substantial improvement in prediction accuracy and resolved the observed output-formatting failures. Persona information improved the zero-shot base model, but it did not improve the fine-tuned model. This preliminary experiment provides strong evidence that SFT teaches the survey prediction task and response schema, but it does not yet demonstrate successful persona conditioning.
+SFT substantially improved wave 4 prediction accuracy, structured-output validity, and evaluation coverage. Accuracy increased from 21.78% to 71.59% without persona context and from 39.47% to
+71.75% with persona context. Both fine-tuned models also produced valid, schema-compliant, scoreable responses for all evaluated examples.
 
-In addition, it is worth noting that this experiment truncates persona to `max_tokens=7000`.
-This may remove persona details relevant to some held-out questions. Further experiments should compare truncated and untruncated personas, alternative persona-compression strategies, and retrieval of question-relevant persona details.
+Persona context improved the base model by 17.69%.  However, after finetuning, persona context improved the primary metric by only 0.16%. While the current results demonstrate successful
+learning of the survey task and response schema, they do not provide sufficient evidence that the finetuned model uses participant-specific information during inference. 
+
+
+### Limitations and Future Work
+
+Current experiment limitation includes:
+
+1. **Persona truncation:** Persona context is limited to 7,000 tokens to fit the experimental sequence limit. This may remove information relevant to some Wave-4 questions. Future experiments should compare larger context budgets, alternative persona compression strategies, and retrieval of question-relevant persona information.
+
+2. **Limited training sample:** The models are fine-tuned with 5,000 examples rather than the complete training split. Training on the full dataset may improve both predictive performance and persona use.
+
+3. **Small base model:** To manage computational cost, the experiment uses `Qwen2.5-0.5B-Instruct` to validate the pipeline. Larger models may be better suited to identify relevant information within long participant histories.
+
+
+
 
 
 ## Business Applications
