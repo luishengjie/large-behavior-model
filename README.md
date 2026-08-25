@@ -5,7 +5,7 @@ Train and evaluate large language models (LLMs) that predict survey response bas
 ### Research Objectives & Questions
 This work investigates the feasibility of using LLMs to simulate individual human survey respondents. The project evaluates two core research questions:
 
-1. **Persona-Driven Prediction (RQ1):** Can an LLM more accurately predict a participant's held out survey reponses when prompted with a persona constructed from their historical responses?
+1. **Persona-Driven Prediction (RQ1):** Can an LLM more accurately predict a participant's held out survey responses when prompted with a persona constructed from their historical responses?
 
 2. **Finetuning Persona (RQ2):** Can supervised fine-tuning teach the model to follow the required response format and improve persona-conditioned prediction accuracy?
 
@@ -97,7 +97,7 @@ Please consider the following product category: Yogurt - Refrigerated. Suppose y
 *Figure 2: Breakdown of how many participant encountered each question ID in their waves 1-3 persona.*
 
 
-Deeper analysis of the question and response formats as well as the persona compositoon is available in the [dataset compisition notebook](notebooks/02_dataset_composition.ipynb). 
+Deeper analysis of the question and response formats as well as the persona composition is available in the [dataset compisition notebook](notebooks/02_dataset_composition.ipynb). 
 
 
 ### Dataset Limitations
@@ -127,11 +127,11 @@ The script used to perform the data split is located at `scripts/preprocess_data
 
 ### Format LLM Input and Target 
 Each example is represented with three key components:
-1. **Context**: The participant's persona, constructed from the non-held-out survery response (`wave1_3_persona_json`, `wave1_3_persona_text`).
+1. **Context**: The participant's persona, constructed from the non-held-out survey response (`wave1_3_persona_json`, `wave1_3_persona_text`).
 2. **Input**: The held-out survey question, excluding participant response (`wave4_Q_wave4_A`).
 3. **Target**: The participant's response to the held-out question (`wave4_Q_wave4_A`).
 
-The persiba and held-out question are provided to the model as inputs while the observed response is used as the prediction target. 
+The persona and held-out question are provided to the model as inputs while the observed response is used as the prediction target. 
 
 Prompt construction and response formatting are implemented in `src/behavior_modeling/data/prompt_formatting.py`.
 
@@ -149,7 +149,7 @@ Several modeling techniques were considered
 
 ### Supervised Fine-tuning
 
-Prompt instructions alone do not gurantee that an open-weight model will consistently produce responses that matches the output schema. During intial evaluation, the base **Qwen2.5-0.5B-Instruct** model produced malformed outputs for some survey questions. For example, for participant `304` and question `QID203`, 
+Prompt instructions alone do not guarantee that an open-weight model will consistently produce responses that matches the output schema. During intial evaluation, the base **Qwen2.5-0.5B-Instruct** model produced malformed outputs for some survey questions. For example, for participant `304` and question `QID203`, 
 
 ```text
 Consider the following situation: A die with 4 red faces and 2 green faces will be rolled 6 times. Before each roll, you will be asked to predict which color—red or green—will show up once the die is rolled.
@@ -187,7 +187,7 @@ The target response was:
 ```
 For matrix questions, `SelectedByPosition` should contain the selected response-option index for each question and `SelectedText` should contain the corresponding response text. Instead, the model appears to have interpreted `SelectedByPosition` as the six matrix-row positions and generated only a single value for `SelectedText`.
 
-This motivates the use of supervised finetuning (SFT) as it matches the learning problem. SFT was selected as verified target responses are already available. Each trainign example contains the participant persona and held-out question as input, and the observed response serves as the ground-truth target.
+This motivates the use of supervised finetuning (SFT) as it matches the learning problem. SFT was selected as verified target responses are already available. Each training example contains the participant persona and held-out question as input, and the observed response serves as the ground-truth target.
 
 During training, loss is computed over the target response tokens. The persona and held-out question provide conditioning context but do not directly contribute to the loss. This trains the model to learn both:
 - the required output structure
@@ -195,9 +195,9 @@ During training, loss is computed over the target response tokens. The persona a
 
 ### Parameter-Efficient Finetuning with LoRA
 
-Finetuning is perfomed using Low-Rank Adaptation (LoRA) rather than full-parameter fine-tuning. LoRA keeps the base-model weights frozen and introduces a smaller set of trainable low-rank parameters.
+Finetuning is performed using Low-Rank Adaptation (LoRA) rather than full-parameter fine-tuning. LoRA keeps the base-model weights frozen and introduces a smaller set of trainable low-rank parameters.
 
-This reduces the number of training paramters, optimizer-state memory, checkpoint size, and overall GPU-memory requirements. This provides a practical approach to test whether SFT can improve prediction performance before considering larger models or more computationally expensive training strategies.
+This reduces the number of training parameters, optimizer-state memory, checkpoint size, and overall GPU-memory requirements. This provides a practical approach to test whether SFT can improve prediction performance before considering larger models or more computationally expensive training strategies.
 
 
 The LoRA configuration used in this experiment is as follows:
@@ -274,9 +274,9 @@ Training and evaluation were performed using the following compute environment:
 | Container storage | 50 GB |
 
 ## Evaluation
-The evaluation accesses whether an LLM can predict participant help-out survey responses from their historical survey data and whether supervised finetuning improves this capability. The experiments addresses the two research questions:
+The evaluation assesses whether an LLM can predict participant held-out survey responses from their historical survey data and whether supervised finetuning improves this capability. The experiments addresses the two research questions:
 
--  **Persona-Driven Prediction (RQ1):** Can an LLM more accurately predict a participant's held out survey reponses when prompted with a persona constructed from their historical responses?
+-  **Persona-Driven Prediction (RQ1):** Can an LLM more accurately predict a participant's held out survey responses when prompted with a persona constructed from their historical responses?
 
 - **Finetuning Persona (RQ2):** Can supervised finetuning teach the model to follow the required response format and improve persona-conditioned prediction accuracy?
 
@@ -388,7 +388,7 @@ The intial experiment is considered successful if:
 
 
 ## Evaluation Results
-All four conditions were evaluated on the same determinsitic sample of 5,000 examples from the test split.
+All four conditions were evaluated on the same deterministic sample of 5,000 examples from the test split.
 
 The primary evaluation metric is **task-weighted normalized accuracy including invalid predictions**. Invalid or unscoreable predictions receive zero score. This prevents models with poor output formatting from obtaining inflated accuracy by excluding their failed predictions.
 
@@ -400,6 +400,18 @@ The models used for evaluation are as follows:
 | Fine-tuned model, no persona | `Qwen2.5-0.5B-Instruct` fine-tuned on survey question–response examples without persona context. This measures learning of the survey task, response distributions, and output schema. |
 | Fine-tuned model + persona | `Qwen2.5-0.5B-Instruct` fine-tuned on personas and survey question–response examples. This is the complete persona-conditioned behavioral model. |
 | Human test–retest | Agreement between participants’ earlier held-out responses and their wave 4 responses. It measures human response stability and provides a reference benchmark, not a strict model-performance upper bound. |
+
+
+### Acceptance-Criteria Outcomes
+
+| Criterion | Outcome |
+|---|---|
+| SFT improves format validity | Met |
+| SFT improves the primary accuracy metric | Met |
+| Fine-tuned model beats the majority baseline | Pending baseline calculation |
+| Persona improves the fine-tuned model | Not demonstrated; observed difference was +0.16 pp |
+| Evaluation uses participant-disjoint splits and Wave-4 targets | Met |
+
 
 ### Overall Prediction Performance
 
@@ -448,7 +460,7 @@ behavioral tasks. This supports the conclusion that SFT improved response-struct
 | Base model | 21.78% | 39.47% | **+17.69%** |
 | Fine-tuned model | 71.59% | 71.75% | **+0.16%** |
 
-The inclusion of persona context substantialy improves the base model. Howwever, finetuned models achieved near identical task-weighted accuracy with and without the persona. The current results do not demonstrate that finetuned models learned to use context to generate accurate wave 4 responses.
+The inclusion of persona context substantially improves the base model. However, finetuned models achieved near identical task-weighted accuracy with and without the persona. The current results do not demonstrate that finetuned models learned to use context to generate accurate wave 4 responses.
 
 ### RQ2: Effect of supervised fine-tuning
 | Input condition | Base model | Fine-tuned model | SFT effect |
